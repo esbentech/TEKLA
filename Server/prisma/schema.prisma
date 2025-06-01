@@ -13,3 +13,305 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
+// Enum estado de los pedidos
+enum EstadoPedido {
+  PENDIENTE_DE_PAGO
+  PAGADO
+  EN_PREPARACION
+  ENTREGADO
+}
+
+// Enum métodos de pago
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+}
+
+// Enum tipos de promociones
+enum TipoPromocion {
+  PORCENTAJE
+  CANTIDAD_FIJA
+}
+
+// Enum aplicable a productos o categorías
+enum AplicableA {
+  PRODUCTO
+  CATEGORIA
+}
+
+// MODELOS DE LA BASE DE DATOS
+
+
+// Modelo de roles
+model Role {
+  id            Int       @id @default(autoincrement())
+  nombre        String    @unique
+  descripcion   String?
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+// Relaciones
+  usuarios      Usuario[]
+}
+
+// Modelo de usuario
+model Usuario {
+  id                 Int                      @id @default(autoincrement())
+  nombreUsuario      String                   @unique
+  correoElectronico  String                   @unique
+  contrasenaHash     String
+  rolId              Int
+  rol                Role                     @relation(fields: [rolId], references: [id])
+  ultimoLogin        DateTime?
+  creadoEn           DateTime                 @default(now())
+  actualizadoEn      DateTime                 @updatedAt
+  
+// Relaciones
+  reseñas            Reseña[]
+  carrito            Carrito?
+  ordenes            Orden[]
+  productosPersonalizados ProductoPersonalizado[] @relation("UsuarioToProductoPersonalizado")
+  ordenesEstadoHistorialAdministradas OrdenEstadoHistorial[] @relation("UsuarioAdministraEstados")
+}
+
+model Categoria {
+  id            Int       @id @default(autoincrement())
+  nombre        String    @unique
+  descripcion   String?
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  productos     Producto[]
+}
+
+model Etiqueta {
+  id            Int       @id @default(autoincrement())
+  nombre        String    @unique
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  productoEtiquetas ProductoEtiqueta[]
+}
+
+model Producto {
+  id                    Int                   @id @default(autoincrement())
+  nombre                String
+  descripcion           String?
+  precioBase            Decimal               @db.Decimal(10, 2)
+  stock                 Int
+  categoriaId           Int
+  categoria             Categoria              @relation(fields: [categoriaId], references: [id])
+  promedioValoracion    Decimal?              @db.Decimal(3, 2)
+  activo                Boolean               @default(true)
+  creadoEn              DateTime              @default(now())
+  actualizadoEn         DateTime              @updatedAt
+
+  productoImagenes      ProductoImagen[]
+  productoEtiquetas     ProductoEtiqueta[]
+  reseñas               Reseña[]
+  carritoItems          CarritoItem[]
+  ordenItems            OrdenItem[]
+  productoAtributos     ProductoAtributo[]
+  productosPersonalizadosBase ProductoPersonalizado[] @relation("ProductoBaseToProductoPersonalizado")
+}
+
+model ProductoImagen {
+  id            Int       @id @default(autoincrement())
+  productoId    Int
+  producto      Producto  @relation(fields: [productoId], references: [id])
+  urlImagen     String
+  orden         Int
+  creadoEn      DateTime  @default(now())
+}
+
+model ProductoEtiqueta {
+  id            Int       @id @default(autoincrement())
+  productoId    Int
+  etiquetaId    Int
+  creadoEn      DateTime  @default(now())
+
+  producto      Producto  @relation(fields: [productoId], references: [id])
+  etiqueta      Etiqueta  @relation(fields: [etiquetaId], references: [id])
+}
+
+model Reseña {
+  id             Int       @id @default(autoincrement())
+  usuarioId      Int
+  productoId     Int
+  fechaReseña    DateTime  @default(now())
+  comentario     String
+  valoracion     Int
+  moderada       Boolean   @default(false)
+  reportes       Int       @default(0)
+  creadoEn       DateTime  @default(now())
+  actualizadoEn  DateTime  @updatedAt
+
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  producto       Producto  @relation(fields: [productoId], references: [id])
+}
+
+model Carrito {
+  id            Int            @id @default(autoincrement())
+  usuarioId     Int            @unique
+  creadoEn      DateTime       @default(now())
+  actualizadoEn DateTime       @updatedAt
+
+  usuario       Usuario        @relation(fields: [usuarioId], references: [id])
+  carritoItems  CarritoItem[]
+}
+
+model CarritoItem {
+  id                 Int                    @id @default(autoincrement())
+  carritoId          Int
+  productoId         Int?
+  customProductoId   Int?
+  cantidad           Int
+  precioUnitario     Decimal                @db.Decimal(10, 2)
+  creadoEn           DateTime               @default(now())
+  actualizadoEn      DateTime               @updatedAt
+
+  carrito            Carrito                @relation(fields: [carritoId], references: [id])
+  producto           Producto?               @relation(fields: [productoId], references: [id])
+  productoPersonalizado ProductoPersonalizado? @relation(fields: [customProductoId], references: [id])
+}
+
+model Orden {
+  id                Int                   @id @default(autoincrement())
+  usuarioId         Int
+  fechaHora         DateTime              @default(now())
+  direccionEnvio    String
+  estadoActual      EstadoPedido
+  metodoPago        MetodoPago
+  subtotal          Decimal               @db.Decimal(10, 2)
+  total             Decimal               @db.Decimal(10, 2)
+  creadoEn          DateTime              @default(now())
+  actualizadoEn     DateTime              @updatedAt
+
+  usuario           Usuario               @relation(fields: [usuarioId], references: [id])
+  ordenItems        OrdenItem[]
+  estadoHistorial   OrdenEstadoHistorial[]
+  historialPromociones HistorialPromocion[]
+}
+
+model OrdenItem {
+  id                 Int                    @id @default(autoincrement())
+  ordenId            Int
+  productoId         Int?
+  customProductoId   Int?
+  cantidad           Int
+  precioUnitario     Decimal                @db.Decimal(10, 2)
+  creadoEn           DateTime               @default(now())
+
+  orden              Orden                  @relation(fields: [ordenId], references: [id])
+  producto           Producto?               @relation(fields: [productoId], references: [id])
+  productoPersonalizado ProductoPersonalizado? @relation(fields: [customProductoId], references: [id])
+}
+
+model OrdenEstadoHistorial {
+  id               Int           @id @default(autoincrement())
+  ordenId          Int
+  estadoAnterior   EstadoPedido
+  estadoNuevo      EstadoPedido
+  fechaHora        DateTime      @default(now())
+  administradorId  Int
+
+  orden            Orden         @relation(fields: [ordenId], references: [id])
+  administrador    Usuario       @relation("UsuarioAdministraEstados", fields: [administradorId], references: [id])
+}
+
+
+model Promocion {
+  id               Int            @id @default(autoincrement())
+  nombre           String
+  tipoPromocion    TipoPromocion
+  aplicableA       AplicableA
+  referenciaId     Int
+  valorDescuento   Decimal        @db.Decimal(10, 2)
+  fechaInicio      DateTime
+  fechaFin         DateTime
+  activo           Boolean        @default(true)
+  creadoEn         DateTime       @default(now())
+  actualizadoEn    DateTime       @updatedAt
+
+  historialPromociones HistorialPromocion[]
+}
+
+model HistorialPromocion {
+  id               Int            @id @default(autoincrement())
+  promocionId      Int
+  ordenId          Int?
+  aplicadoA        AplicableA
+  referenciaId     Int
+  fechaAplicado    DateTime       @default(now())
+
+  promocion        Promocion      @relation(fields: [promocionId], references: [id])
+  orden            Orden?         @relation(fields: [ordenId], references: [id])
+}
+
+model AtributoPersonalizacion {
+  id               Int                       @id @default(autoincrement())
+  nombre           String
+  descripcion      String?
+  creadoEn         DateTime                  @default(now())
+  actualizadoEn    DateTime                  @updatedAt
+
+  opciones         OpcionPersonalizacion[]
+  productoAtributos ProductoAtributo[]
+  personalizacionesSeleccionadas PersonalizacionSeleccionada[] @relation("AtributoPersonalizacionToPersonalizacionSeleccionada")
+}
+
+model OpcionPersonalizacion {
+  id                Int                       @id @default(autoincrement())
+  atributoId        Int
+  nombreOpcion      String
+  costoAdicional    Decimal                   @db.Decimal(10, 2)
+  creadoEn          DateTime                  @default(now())
+  actualizadoEn     DateTime                  @updatedAt
+
+  atributo          AtributoPersonalizacion   @relation(fields: [atributoId], references: [id])
+  personalizaciones PersonalizacionSeleccionada[]
+}
+
+model ProductoAtributo {
+  id             Int                       @id @default(autoincrement())
+  productoId     Int
+  atributoId     Int
+  creadoEn       DateTime                  @default(now())
+
+  producto       Producto                  @relation(fields: [productoId], references: [id])
+  atributo       AtributoPersonalizacion   @relation(fields: [atributoId], references: [id])
+}
+
+model ProductoPersonalizado {
+  id                 Int                    @id @default(autoincrement())
+  usuarioId          Int
+  productoBaseId     Int
+  precioBase         Decimal                @db.Decimal(10, 2)
+  precioTotal        Decimal                @db.Decimal(10, 2)
+  creadoEn           DateTime               @default(now())
+  actualizadoEn      DateTime               @updatedAt
+
+  usuario            Usuario                @relation("UsuarioToProductoPersonalizado", fields: [usuarioId], references: [id])
+  productoBase       Producto               @relation("ProductoBaseToProductoPersonalizado", fields: [productoBaseId], references: [id])
+  carritoItems       CarritoItem[]
+  ordenItems         OrdenItem[]
+  personalizaciones  PersonalizacionSeleccionada[]
+}
+model PersonalizacionSeleccionada {
+  id                 Int                      @id @default(autoincrement())
+  customProductoId   Int
+  atributoId         Int
+  opcionId           Int
+  creadoEn           DateTime                 @default(now())
+
+  productoPersonalizado ProductoPersonalizado  @relation(fields: [customProductoId], references: [id])
+  atributo           AtributoPersonalizacion   @relation("AtributoPersonalizacionToPersonalizacionSeleccionada", fields: [atributoId], references: [id])
+  opcion             OpcionPersonalizacion     @relation(fields: [opcionId], references: [id])
+}
+
+
+
+
+
+
