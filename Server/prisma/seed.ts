@@ -2,6 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 
+
 import { roles } from "./seeds/roles";
 import { usuarios } from "./seeds/usuario";
 import { categorias } from "./seeds/categorias";
